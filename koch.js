@@ -1,28 +1,32 @@
-var vertexShaderText = 
-[
-'precision mediump float;',
-'',
-'attribute vec2 vertposition;',
-'',
-'void main()',
-'{',
-'   gl_Position = vec4(vertposition, 0.0, 1.0);',
-'}'
-].join('\n');
+var vertexShaderText = `
+precision mediump float;
 
-var fragmentShaderText =
-[
-'precision mediump float;',
-'',
-'void main()',
-'{',
-'   gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);',
-'}'
-].join('\n');
+attribute vec2 vertposition;
+
+void main()
+{
+   gl_Position = vec4(vertposition, 0.0, 1.0);
+}
+`;
+
+var fragmentShaderText = `
+precision mediump float;
+
+uniform vec4 u_color;
+
+void main(){
+    gl_FragColor = u_color;
+}
+`;
+
 
 
 var sq3 = 1.73205080757; 
 var angle = 0.0;
+
+var slider = document.getElementById('depth');
+var sliderValue = slider.value;
+document.getElementById('value').innerHTML = slider.value;
 
 function init() {
     var canvas = document.getElementById("graphics-surface");
@@ -31,7 +35,28 @@ function init() {
         console.log("no gl for you :(");
     }
 
-    var slider = document.getElementById('depth');
+    
+
+    var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderText);
+    var fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderText);
+
+    var program = createProgram(gl, vertexShader, fragmentShader);
+
+    var postitionAttribLocation = gl.getAttribLocation(program, 'vertposition');
+    var colorUniformLocation = gl.getUniformLocation(program, "u_color");
+    gl.vertexAttribPointer(postitionAttribLocation, size, type, normalize, stride, offset);
+    gl.enableVertexAttribArray(postitionAttribLocation);
+
+    var positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+    var size = 2;          // 2 components per iteration
+    var type = gl.FLOAT;   // the data is 32bit floats
+    var normalize = false; // don't normalize the data
+    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+    var offset = 0;        // start at the beginning of the buffer
+
+    
 
     var then = 0.0;
     var rotationSpeed = 0.5;
@@ -44,68 +69,71 @@ function init() {
         then = now;
         angle += rotationSpeed * deltaTime;
         
-        document.getElementById('value').innerHTML = slider.value;
-
-        
-        
         
 
         gl.clearColor(1.0, 1.0, 0.8, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-        var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-        var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-
-        gl.shaderSource(vertexShader,vertexShaderText);
-        gl.shaderSource(fragmentShader, fragmentShaderText);
-
-        gl.compileShader(vertexShader);
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)){
-            console.error("error compiling vertex shader", gl.getShaderInfoLog(vertexShader));
-            return;
-        }
-
-        gl.compileShader(fragmentShader);
-        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
-            console.error("error compiling fragment shader", gl.getShaderInfoLog(fragmentShader));
-            return;
-        }
-
-        var program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)){
-            console.error("error compiling program", gl.getProgramInfoLog(program));
-            return;
-        }
-
+        
         var res = get_koch(slider.value, angle);
-        var vertices = simpleVec(res[0]);
+        var loopVertices = simpleVec(res[0]);
         var triangles = simpleVec(res[1]);
 
-        var triangleVertexBufferObject = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBufferObject);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        
 
-        var postitionAttribLocation = gl.getAttribLocation(program, 'vertposition');
-        gl.vertexAttribPointer(
-            postitionAttribLocation, //attribute location
-            2, //num of elems in attribute
-            gl.FLOAT, // elem type
-            gl.FALSE,
-            2 * Float32Array.BYTES_PER_ELEMENT, // size of vertex
-            0 //offset
-        );
-
-        gl.enableVertexAttribArray(postitionAttribLocation);
+       
+        
 
         //main render loop
         gl.useProgram(program);
-        gl.drawArrays(gl.LINE_LOOP, 0, vertices.length/2);
+        var count = loopVertices.length / 2;
+        // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles.concat(positions)), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles), gl.STATIC_DRAW);
+        gl.uniform4f(colorUniformLocation, 1, 0, 0, 1);
+        gl.drawArrays(gl.TRIANGLES, 0, count);
+
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(loopVertices), gl.STATIC_DRAW);
+        gl.uniform4f(colorUniformLocation, 0, 0, 0, 1);
+        gl.drawArrays(gl.LINE_LOOP, 0, count);
         
         requestAnimationFrame(drawScene);
     }
+}
+
+function createShader(gl, type, src){
+    var shader = gl.createShader(type);
+
+    gl.shaderSource(shader, src);
+    gl.compileShader(shader);
+
+    var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+    if (success){
+        return shader;
+        
+    }else{
+        console.error("error compiling vertex shader", gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+    }
+}
+
+function createProgram(gl, vertexShader, fragmentShader){
+    var program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    var success = gl.getProgramParameter(program, gl.LINK_STATUS);
+    if (success){
+        return program;
+    } else {
+        console.error("error compiling program", gl.getProgramInfoLog(program));
+        gl.deleteProgram(program);
+    }
+}
+
+function update(){
+    sliderValue = slider.value;
+    document.getElementById('value').innerHTML = slider.value;
 }
 
 function rotate(p, a){
@@ -193,3 +221,13 @@ function simpleVec(lst){
     return res;
 }
 
+function printVert(lst){
+    var s = "";
+    for (var i = 0; i < lst.length; i+= 1){
+        s+= "(" + lst[i].x + ", " + lst[i].y + "),";
+    }
+    return s;
+}
+var res = get_koch(2,0);
+console.log(res);
+console.log(printVert(res[1]));
