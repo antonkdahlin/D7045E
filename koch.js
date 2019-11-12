@@ -44,8 +44,7 @@ function init() {
 
     var postitionAttribLocation = gl.getAttribLocation(program, 'vertposition');
     var colorUniformLocation = gl.getUniformLocation(program, "u_color");
-    gl.vertexAttribPointer(postitionAttribLocation, size, type, normalize, stride, offset);
-    gl.enableVertexAttribArray(postitionAttribLocation);
+   
 
     var positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -56,7 +55,8 @@ function init() {
     var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
     var offset = 0;        // start at the beginning of the buffer
 
-    
+    gl.vertexAttribPointer(postitionAttribLocation, size, type, normalize, stride, offset);
+    gl.enableVertexAttribArray(postitionAttribLocation);
 
     var then = 0.0;
     var rotationSpeed = 0.5;
@@ -196,8 +196,12 @@ function third_vec(a, b){
 }
 
 function get_koch(n, angle){
-    var p1 = new Vector(-0.7, -0.7/sq3);
-    var p2 = new Vector(0.7, -0.7/sq3);
+    var width = 1.4; //d = 1.4 
+    //h = sq3*d/2
+    //y = 0-h/3 = -sq3*d/6
+
+    var p1 = new Vector(-width/2, -sq3*width/6);
+    var p2 = new Vector(width/2, -sq3*width/6);
     p1 = rotate(p1, angle);
     p2 = rotate(p2, angle);
     var b = third_vec(p1, p2);
@@ -228,6 +232,3 @@ function printVert(lst){
     }
     return s;
 }
-var res = get_koch(2,0);
-console.log(res);
-console.log(printVert(res[1]));
