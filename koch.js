@@ -3,9 +3,11 @@ precision mediump float;
 
 attribute vec2 vertposition;
 
+uniform mat2 rotation;
+
 void main()
 {
-   gl_Position = vec4(vertposition, 0.0, 1.0);
+   gl_Position = vec4(rotation * vertposition, 0.0, 1.0);
 }
 `;
 
@@ -43,6 +45,7 @@ function init() {
     var program = createProgram(gl, vertexShader, fragmentShader);
 
     var postitionAttribLocation = gl.getAttribLocation(program, 'vertposition');
+    var rotationUniformLocation = gl.getUniformLocation(program, 'rotation');
     var colorUniformLocation = gl.getUniformLocation(program, "u_color");
    
 
@@ -61,43 +64,53 @@ function init() {
     var then = 0.0;
     var rotationSpeed = 0.5;
 
+    
+    //gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(), gl.STATIC_DRAW);
+
+    var count = updateBuffer(gl);
+    var prev = sliderValue;
+
     requestAnimationFrame(drawScene);
     function drawScene(now) {
-        
+        if (sliderValue != prev){
+            count = updateBuffer(gl);
+            prev = sliderValue;
+        }
+
         now *= 0.001;
         var deltaTime = now - then;
         then = now;
         angle += rotationSpeed * deltaTime;
-        
-        
+
+        var cos = Math.cos(angle);
+        var sin = Math.sin(angle);
+        gl.uniformMatrix2fv(rotationUniformLocation, false, [cos, -sin, sin, cos]);
 
         gl.clearColor(1.0, 1.0, 0.8, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-        
-        var res = get_koch(slider.value, angle);
-        var loopVertices = simpleVec(res[0]);
-        var triangles = simpleVec(res[1]);
-
-        
-
-       
-        
-
-        //main render loop
         gl.useProgram(program);
-        var count = loopVertices.length / 2;
-        // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles.concat(positions)), gl.STATIC_DRAW);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles), gl.STATIC_DRAW);
+        
+        
+        
         gl.uniform4f(colorUniformLocation, 1, 0, 0, 1);
         gl.drawArrays(gl.TRIANGLES, 0, count);
 
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(loopVertices), gl.STATIC_DRAW);
+        
         gl.uniform4f(colorUniformLocation, 0, 0, 0, 1);
-        gl.drawArrays(gl.LINE_LOOP, 0, count);
+        gl.drawArrays(gl.LINE_LOOP, count, count);
         
         requestAnimationFrame(drawScene);
     }
+}
+
+function updateBuffer(gl){
+    var res = get_koch(sliderValue);
+    var loopVertices = simpleVec(res[0]);
+    var triangles = simpleVec(res[1]);
+
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles.concat(loopVertices)), gl.STATIC_DRAW);
+    return loopVertices.length / 2;
 }
 
 function createShader(gl, type, src){
@@ -195,15 +208,13 @@ function third_vec(a, b){
     return tmp.div(2);
 }
 
-function get_koch(n, angle){
+function get_koch(n){
     var width = 1.4; //d = 1.4 
     //h = sq3*d/2
     //y = 0-h/3 = -sq3*d/6
 
     var p1 = new Vector(-width/2, -sq3*width/6);
     var p2 = new Vector(width/2, -sq3*width/6);
-    p1 = rotate(p1, angle);
-    p2 = rotate(p2, angle);
     var b = third_vec(p1, p2);
     
     var l1 = koch_line(p1, p2, b, n);
