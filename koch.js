@@ -67,13 +67,13 @@ function init() {
     
     //gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(), gl.STATIC_DRAW);
 
-    var count = updateBuffer(gl);
+    var count = setGeometry(gl);
     var prev = sliderValue;
 
     requestAnimationFrame(drawScene);
     function drawScene(now) {
         if (sliderValue != prev){
-            count = updateBuffer(gl);
+            count = setGeometry(gl);
             prev = sliderValue;
         }
 
@@ -104,7 +104,7 @@ function init() {
     }
 }
 
-function updateBuffer(gl){
+function setGeometry(gl){
     var res = get_koch(sliderValue);
     var loopVertices = simpleVec(res[0]);
     var triangles = simpleVec(res[1]);
