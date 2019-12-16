@@ -3,11 +3,36 @@
     <head>
         <meta charset="utf-8">
         <link rel="stylesheet" type="text/css" href="style.css">
-        
+        <script src="vector.js"></script>
+        <script src="jarvis_march.js"></script>
+        <script src="triangulation.js"></script>
+        <script>
+            {
+                let p1 = new Point(0, -1);
+                let p2 = new Point(0, 0);
+                let p3 = new Point(-1, 1);
+                let p4 = new Point(0, 1);
+                let p5 = new Point(1, 1);
+                let p6 = new Point(-1, 0);
+
+                console.assert(Point.det(p1,p2,p3) == 1);
+                console.assert(Point.det(p1,p2,p4) == 0);
+                console.assert(Point.det(p1,p2,p5) == -1);
+                console.assert(Point.det(p1, p2, p6) > 0 );
+            }
+            {
+                let p1 = new Point(3,3);
+                let p2 = new Point(4,5);
+                console.assert(Point.distance_squared(p1,p2) == 5);
+            }
+        </script>
     </head>
     <body onload="init();">
-        <canvas id="graphics-surface" width="400" height="400"></canvas>
-        
-        <script src="jarvis_march.js"></script>
+        <canvas id="graphics-surface" width="400" height="400"></canvas></br>
+        <input type="file" name="vsoup" id="vsoup" accept=".txt"/></br>
+        <input type="number" min="3" max="10000" id="noVertices"/>
+        <button onclick="genRandom()">gen random</button>
+        <!--<button onclick="genFromFile()">gen from file</button>-->
+        <script src="main.js"></script>
     </body>
 </html>

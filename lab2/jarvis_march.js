@@ -1,30 +1,3 @@
-var vertexShaderText = `
-precision mediump float;
-
-attribute vec2 vertposition;
-
-void main()
-{
-   gl_Position = vec4(vertposition, 0.0, 1.0);
-   gl_PointSize = 1.0;
-}
-`;
-
-var fragmentShaderText = `
-precision mediump float;
-
-void main(){
-    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-}
-`;
-/*
-40
-32
-27
-25
-21
-30
-*/
 
 
 
@@ -52,35 +25,31 @@ class Point {
         this.x = x;
         this.y = y;
     }
-}
 
-class Vector {
+    as_simple_vec(){
+        return [this.x, this.y];
+    }
+
     /**
+     * Det of (ab ap)
+     * returns pos if p is left of line ab, 0 if on line otherwise neg
      * 
-     * @param {number} x 
-     * @param {number} y 
+     * @param {Point} a 
+     * @param {Point} b 
+     * @param {Point} p 
+     * 
+     * @returns {number} 
      */
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-    }
-    add(v){
-        return new Vector(v.x + this.x, v.y + this.y);
-    }
-    scale(f){
-        return new Vector(this.x * f, this.y * f);
-    }
-    sub(v){
-        return this.add(v.scale(-1.0));
-    }
-    div(f){
-        return this.scale(1/f);
-    }
-    dotproduct(vec) {
-        return (this.x * vec.x + this.y * vec.y);
+    static det(a,b,p) {
+        return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);
     }
 
+    static distance_squared(a, b = new Point(0,0)){
+        return Math.pow(a.x-b.x, 2) + Math.pow(a.y-b.y, 2);
+    }
 }
+
+
 
 /**
  * Assumes all points are unique
@@ -113,7 +82,7 @@ function jarvis_march(vertices){
 //                    1  2  x
 function pseudo_angle(a, b, p) {
     //(x−x1)(y2−y1)−(y−y1)(x2−x1)
-    var  det_pa_pb = (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x);
+    var det_pa_pb = (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x);
     return det_pa_pb;
 }
 
@@ -136,110 +105,3 @@ function leftmost(v){
 }
 
 
-function init() {
-    var canvas = document.getElementById("graphics-surface");
-    var gl = canvas.getContext('webgl');
-    if (!canvas){
-        console.log("no gl for you :(");
-    }
-
-    var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderText);
-    var fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderText);
-
-    var program = createProgram(gl, vertexShader, fragmentShader);
-
-    var postitionAttribLocation = gl.getAttribLocation(program, 'vertposition');
-   
-
-    var positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    var size = 2;          // 2 components per iteration
-    var type = gl.FLOAT;   // the data is 32bit floats
-    var normalize = false; // don't normalize the data
-    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-    var offset = 0;        // start at the beginning of the buffer
-
-    gl.vertexAttribPointer(postitionAttribLocation, size, type, normalize, stride, offset);
-    gl.enableVertexAttribArray(postitionAttribLocation);
-
-
-    var count = 10;
-    var lines = setGeometry(gl, count);
-
-    console.log("number of lines: " + lines);
-
-
-    gl.clearColor(1.0, 1.0, 0.8, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-
-    gl.useProgram(program);
-    
-    gl.drawArrays(gl.POINTS, 0, count);
-    gl.drawArrays(gl.LINE_LOOP, count, lines);
-
-
-    
-        
-    
-}
-
-function setGeometry(gl, count){
-    var vertices = [];
- 
-    for (var i = 0; i < count; i+=1){
-        vertices.push(new Point(Math.random() * 2 - 1, Math.random() * 2 - 1));
-    }
-
-    var hull = jarvis_march(vertices);
-
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(simpleVec(vertices).concat(simpleVec(hull))), gl.STATIC_DRAW);
-    return hull.length;
-}
-
-function createShader(gl, type, src){
-    var shader = gl.createShader(type);
-
-    gl.shaderSource(shader, src);
-    gl.compileShader(shader);
-
-    var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-    if (success){
-        return shader;
-        
-    }else{
-        console.error("error compiling vertex shader", gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-    }
-}
-
-function createProgram(gl, vertexShader, fragmentShader){
-    var program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-
-    var success = gl.getProgramParameter(program, gl.LINK_STATUS);
-    if (success){
-        return program;
-    } else {
-        console.error("error compiling program", gl.getProgramInfoLog(program));
-        gl.deleteProgram(program);
-    }
-}
-
-function simpleVec(lst){
-    var res = [];
-    for (var i = 0; i < lst.length; i += 1){
-        res.push(lst[i].x, lst[i].y);
-    }
-    return res;
-}
-
-function printVert(lst){
-    var s = "";
-    for (var i = 0; i < lst.length; i+= 1){
-        s+= "(" + lst[i].x + ", " + lst[i].y + "),";
-    }
-    return s;
-}
