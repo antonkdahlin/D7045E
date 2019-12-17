@@ -1,15 +1,40 @@
+// var vertexShaderText = `
+// precision mediump float;
+
+// attribute vec2 vertposition;
+// attribute vec4 a_color;
+
+// varying vec4 v_color;
+
+// void main()
+// {
+//    gl_Position = vec4(vertposition * 0.9, 0.0, 1.0);
+//    v_color = a_color;
+//    gl_PointSize = 4.0;
+// }
+// `;
+
+// var fragmentShaderText = `
+// precision mediump float;
+
+// varying vec4 v_color;
+
+// void main(){
+//     gl_FragColor = v_color;
+// }
+// `;
+
 var vertexShaderText = `
 precision mediump float;
 
 attribute vec2 vertposition;
-attribute vec4 a_color;
 
-varying vec4 v_color;
+
+
 
 void main()
 {
    gl_Position = vec4(vertposition * 0.9, 0.0, 1.0);
-   v_color = a_color;
    gl_PointSize = 4.0;
 }
 `;
@@ -17,15 +42,15 @@ void main()
 var fragmentShaderText = `
 precision mediump float;
 
-varying vec4 v_color;
+uniform vec4 fcolor;
 
 void main(){
-    gl_FragColor = v_color;
+    gl_FragColor = fcolor;
 }
 `;
 
 //global source for vertices
-var default_vertex = [new Point(-1, -1), new Point(1, -1), new Point(1, 1), new Point(-1, 1), new Point(0, 0)];
+var default_vertex = [new Point(-1, -1), new Point(1, -1), new Point(1, 1), new Point(-1, 1), new Point(0, 0)]; // four corners and a center
 var vertex_source = [];
 document.getElementById('vsoup').addEventListener('change', handleFileSelect, false); 
 var updated = false;
@@ -79,37 +104,60 @@ function init() {
     var program = createProgram(gl, vertexShader, fragmentShader);
 
     var postitionLocation = gl.getAttribLocation(program, 'vertposition');
-    var colorLocation = gl.getAttribLocation(program, 'a_color');
-   
+    //var colorLocation = gl.getAttribLocation(program, 'a_color');
+    var colorLocation = gl.getUniformLocation(program, 'fcolor');   
     
-    var positionBuffer = gl.createBuffer();
-    var tree;
-    if (vertex_source.length == 0){
-        tree = triangulate(default_vertex);
-    }else{
-        tree = triangulate(vertex_source);
-    }
+    
+    
+    var vertices = get_vertices();
+    assign_ids(vertices);
+    var tree = triangulate(vertices);
     var triangles = tree.get_triangles();
-    var data = tree.get_triangles_as_simple_vec();
+    // const line_data = get_line_data()
+    const triangle_indices = get_triangle_indices(triangles); 
+    console.log(triangle_indices);
+
     console.log(triangles);
     triangles.forEach(triangle => {
         triangle.set_color();
     });
+    // var color_data = getColorData_fromtriangle(triangles);
+    var vertex_data = get_vertex_data(vertices);
 
-    //console.log(data);
+    const point_indices = get_point_indices(vertices);
+    const line_indices = get_line_indices(triangles);
 
-    var vertex_count = data.length / 2;
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    console.log("begin");
+    console.log(vertex_data);
+    console.log(triangle_indices);
+    console.log(point_indices);
+    console.log(line_indices);
+    //console.log(color_data);
+    console.log("end");
 
-    var colorBuffer = gl.createBuffer();
-    //var data = getColorData(vertex_count);
-    var data = getColorData_fromtriangle(triangles);
 
-    console.log(data);
+    const vertex_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertex_data), gl.STATIC_DRAW);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+    // var colorBuffer = gl.createBuffer();
+    // gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color_data), gl.STATIC_DRAW);
+
+
+    const triangleIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangle_indices), gl.STATIC_DRAW);
+
+    const pointIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pointIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(point_indices), gl.STATIC_DRAW);
+
+    const lineIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(line_indices), gl.STATIC_DRAW);
+    
 
     drawScene();
 
@@ -120,28 +168,43 @@ function init() {
         gl.useProgram(program);
 
         // position
-        gl.enableVertexAttribArray(postitionLocation);
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+        
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleIndexBuffer);
 
-        var size = 2;          // 2 components per iteration
+        var size = 2;          // n components per iteration
         var type = gl.FLOAT;   // the data is 32bit floats
         var normalize = false; // don't normalize the data
         var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
         var offset = 0;        // start at the beginning of the buffer
         gl.vertexAttribPointer(postitionLocation, size, type, normalize, stride, offset);
+        gl.enableVertexAttribArray(postitionLocation);
 
         // colour
-        gl.enableVertexAttribArray(colorLocation);
-        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+       
+        // gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
 
-        var size = 4;          // 4 components per iteration
-        var type = gl.FLOAT;   // the data is 32bit floats
-        var normalize = false; // don't normalize the data
-        var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-        var offset = 0;        // start at the beginning of the buffer
-        gl.vertexAttribPointer(colorLocation, size, type, normalize, stride, offset);
+        // var size = 4;          // 4 components per iteration
+        // var type = gl.FLOAT;   // the data is 32bit floats
+        // var normalize = false; // don't normalize the data
+        // var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+        // var offset = 0;        // start at the beginning of the buffer
+        // gl.vertexAttribPointer(colorLocation, size, type, normalize, stride, offset);
+        // gl.enableVertexAttribArray(colorLocation);
 
-        gl.drawArrays(gl.TRIANGLES, 0, vertex_count);
+        //gl.drawArrays(gl.TRIANGLES, 0, vertex_count);
+        for (var i = 0;  i < triangles.length; i += 1){
+            gl.uniform4f(colorLocation, triangles[i].color[0], triangles[i].color[1], triangles[i].color[2],1);
+            gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, i*6);
+        }
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pointIndexBuffer);
+        gl.uniform4f(colorLocation, 0,0,0,1);
+        gl.drawElements(gl.POINTS, point_indices.length, gl.UNSIGNED_SHORT, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+        gl.drawElements(gl.LINES, line_indices.length , gl.UNSIGNED_SHORT, 0);
+
         //gl.drawArrays(gl.LINES, 0, vertex_count);
     }
     // genRandom(3);
@@ -173,6 +236,57 @@ function init() {
         
     //     requestAnimationFrame(drawScene);
     // }
+}
+
+function get_line_indices(triangles){
+    res = [];
+    triangles.forEach(triangle => {
+        let a = triangle.a;
+        let b = triangle.b;
+        let c = triangle.c;
+        res.push(a.id, b.id, b.id, c.id, c.id, a.id);
+    });
+    return res;
+}
+
+function get_point_indices(vertices){
+    res = [];
+    vertices.forEach(vertex => {
+        res.push(vertex.id);
+    });
+    return res;
+}
+
+function get_vertex_data(vertices){
+    res = [];
+    vertices.forEach(vertex => {
+        res.push(vertex.x, vertex.y);
+    });
+    return res;
+}
+
+function get_triangle_indices(triangles){
+    var res = [];
+    triangles.forEach(triangle => {
+        res.push(triangle.a.id, triangle.b.id, triangle.c.id);
+    });
+    return res;
+}
+
+function assign_ids(v) {
+    var count = 0;
+    v.forEach(vertex => {
+        vertex.id = count;
+        count += 1;
+    });
+}
+
+function get_vertices(){
+    if (vertex_source.length <= 3){
+        return default_vertex;
+    }else{
+        return vertex_source;
+    }
 }
 
 function getColorData(n) {
