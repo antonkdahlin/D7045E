@@ -21,7 +21,7 @@ const nodetype = {
 }
 
 const Color = {
-    RED: [1.0, 0, 0],
+    RED: [1.0, 0.0, 0.0],
     GREEN: [0, 1.0, 0],
     BLUE: [0, 0, 1.0],
     YELLOW: [1.0, 1.0, 0],
@@ -325,20 +325,43 @@ class Triangle {
             }
         });
     }
+
+
+    barycentric_test(p){
+        // https://en.wikipedia.org/wiki/Barycentric_coordinate_system
+        var detT = (this.b.y - this.c.y)*(this.a.x-this.c.x)+(this.c.x-this.b.x)*(this.a.y-this.c.y);
+        var w1 = ((this.b.y-this.c.y)*(p.x-this.c.x)+(this.c.x-this.b.x)*(p.y-this.c.y))/detT;
+        var w2 = ((this.c.y-this.a.y)*(p.x-this.c.x)+(this.a.x-this.c.x)*(p.y-this.c.y))/detT;
+        var w3 = 1-w1-w2;
+
+        console.log(`w1:${w1}, w2:${w2}, w3:${w3}`);
+    }
 }
 
 
 function triangulate(points) {
     var hull = jarvis_march(points).reverse(); 
+
+    hull.forEach(point  => {
+        point.distance = 0;
+        console.log(point.distance);
+    });
+    console.log(hull);
     // console.log(hull);
     // find c inside of triangle
     var c = hull[0];
+    console.log(c);
     var others = [];
     var middle = get_middle(hull);
     var min_distance = Number.POSITIVE_INFINITY;
     for (let point of points) {
-        if (!hull.includes(point)){
+        if (!hull.includes(point)){ // point is not in hull
             others.push(point);
+            // get distance to hull lazily, get min distance to POINT on hull 
+            // when shortest way to hull most often will be between two point on hull
+            var min_hull_distance = getMinDistance(point, hull);
+            point.distance = min_hull_distance;
+
             if (Point.distance_squared(middle, point) < min_distance){
                 min_distance = Point.distance_squared(middle, point);
                 c = point;
@@ -356,7 +379,6 @@ function triangulate(points) {
     // initialized tree with only binary nodes
     var tree = init_fan(c, hull.concat([hull[0]]), null);
     var triangles  = tree.get_triangles();
-    console.log(triangles);
     //link together all triangles
     for (var i = 0; i < triangles.length; i += 1){
         triangles[i].neighbor_bc = triangles[(i+1) % triangles.length];
@@ -367,7 +389,10 @@ function triangulate(points) {
     
 
     while (others.length > 0){
+        // p is new point in triangulation
         var p = others.shift();
+        
+        // pointIn is one or two triangles which p is in
         var pointIn = tree.query(p);
 
         // multiple triangles i.e. on edge
@@ -419,6 +444,19 @@ function get_middle(hull) {
     return new Point(x/hull.length, y/hull.length);
 }
 
+
+
+function getMinDistance(point, hull){
+    var min = Number.POSITIVE_INFINITY;
+    hull.forEach(pointOnHull => {
+        var distance = Point.distance_squared(point, pointOnHull); 
+        if (distance < min){
+            min = distance;
+        }
+    });
+    return min;
+}
+
 /**
  * 
  * @param {Point} c 
@@ -428,6 +466,7 @@ function get_middle(hull) {
  */
 function init_fan(c, points, parent) {
     // base case
+    console.log(points);
     if (points.length == 2) {
         var triangle = new Triangle(points[0], points[1], c);
         var node = new LeafNode(triangle, parent);

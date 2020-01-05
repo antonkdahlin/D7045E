@@ -31,7 +31,15 @@
         <canvas id="graphics-surface" width="400" height="400"></canvas></br>
         <input type="file" name="vsoup" id="vsoup" accept=".txt"/></br>
         <input type="number" min="3" max="10000" id="noVertices"/>
-        <button onclick="genRandom()">gen random</button>
+        
+        <button onclick="genRandom()">gen random</button></br>
+        <label>color scheme</label>
+        <select id="selectedColorScheme" onchange="init()">
+            <option value="simple">simple</option>
+            <option value="barycentric">barycentric</option>
+            <option value="4colors">4colors</option>
+        </select>
+
         <!--<button onclick="genFromFile()">gen from file</button>-->
         <script src="main.js"></script>
     </body>

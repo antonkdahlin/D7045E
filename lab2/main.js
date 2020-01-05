@@ -1,36 +1,33 @@
-// var vertexShaderText = `
-// precision mediump float;
+var vertexShaderTextAlt = `
+precision mediump float;
 
-// attribute vec2 vertposition;
-// attribute vec4 a_color;
+attribute vec2 vertposition;
+attribute vec4 a_color;
 
-// varying vec4 v_color;
+varying vec4 v_color;
 
-// void main()
-// {
-//    gl_Position = vec4(vertposition * 0.9, 0.0, 1.0);
-//    v_color = a_color;
-//    gl_PointSize = 4.0;
-// }
-// `;
+void main()
+{
+   gl_Position = vec4(vertposition * 0.9, 0.0, 1.0);
+   v_color = a_color;
+   gl_PointSize = 4.0;
+}
+`;
 
-// var fragmentShaderText = `
-// precision mediump float;
+var fragmentShaderTextAlt = `
+precision mediump float;
 
-// varying vec4 v_color;
+varying vec4 v_color;
 
-// void main(){
-//     gl_FragColor = v_color;
-// }
-// `;
+void main(){
+    gl_FragColor = v_color;
+}
+`;
 
 var vertexShaderText = `
 precision mediump float;
 
 attribute vec2 vertposition;
-
-
-
 
 void main()
 {
@@ -97,17 +94,33 @@ function init() {
     if (!canvas){
         console.log("no gl for you :(");
     }
+    var colorScheme = document.getElementById("selectedColorScheme").value;
+    console.log(colorScheme);
 
     var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderText);
     var fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderText);
 
+
+    var vertexShaderAlt = createShader(gl, gl.VERTEX_SHADER, vertexShaderTextAlt);
+    var fragmentShaderAlt = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderTextAlt);
+
     var program = createProgram(gl, vertexShader, fragmentShader);
+
+    var programAlt = createProgram(gl, vertexShaderAlt, fragmentShaderAlt);
 
     var postitionLocation = gl.getAttribLocation(program, 'vertposition');
     //var colorLocation = gl.getAttribLocation(program, 'a_color');
     var colorLocation = gl.getUniformLocation(program, 'fcolor');   
     
-    
+    {
+        let a = new Point(0, 1);
+        let b = new Point(0, 0);
+        let c = new Point(1,0);
+        let p = new Point(.5, -1);
+        let triangletest = new Triangle(a,b,c);
+        triangletest.barycentric_test(p);
+    }
+        
     
     var vertices = get_vertices();
     assign_ids(vertices);
@@ -115,25 +128,54 @@ function init() {
     var triangles = tree.get_triangles();
     // const line_data = get_line_data()
     const triangle_indices = get_triangle_indices(triangles); 
-    console.log(triangle_indices);
+    //console.log(triangle_indices);
 
-    console.log(triangles);
+    //console.log(triangles);
+
+    // for the 4color scheme
     triangles.forEach(triangle => {
         triangle.set_color();
     });
+
+    // gradient scheme
+    /**
+     * 1. choose 3 vertices, rgb
+     * 2. calculate the color of each vertex
+     * 3. create color data for triangles
+     */
+    // vertices
+    let red_index = Math.floor(Math.random() * vertices.length);
+    let green_index;
+    do{
+        green_index = Math.floor(Math.random() * vertices.length);
+    }
+    while (green_index === red_index);
+
+    let blue_index;
+    do{
+        blue_index = Math.floor(Math.random() * vertices.length);
+    }
+    while (blue_index === red_index || blue_index === green_index);
+
+    vertices.forEach(vertex => {
+        var col = get_barycentric_color(vertex, vertices[red_index], vertices[green_index], vertices[blue_index]);
+        
+    });
+
+    console.log(`v_len:${vertices.length}, i1:${blue_index}, i2:${green_index}, i3:${blue_index}`);
     // var color_data = getColorData_fromtriangle(triangles);
     var vertex_data = get_vertex_data(vertices);
 
     const point_indices = get_point_indices(vertices);
     const line_indices = get_line_indices(triangles);
 
-    console.log("begin");
-    console.log(vertex_data);
-    console.log(triangle_indices);
-    console.log(point_indices);
-    console.log(line_indices);
-    //console.log(color_data);
-    console.log("end");
+    // console.log("begin");
+    // console.log(vertex_data);
+    // console.log(triangle_indices);
+    // console.log(point_indices);
+    // console.log(line_indices);
+    // console.log(color_data);
+    // console.log("end");
 
 
     const vertex_buffer = gl.createBuffer();
@@ -238,6 +280,17 @@ function init() {
     // }
 }
 
+/**
+ * 
+ * @param {Point} vertex 
+ * @param {Point} red 
+ * @param {Point} green 
+ * @param {Point} blue 
+ */
+function get_barycentric_color(vertex, triangle){
+
+}
+
 function get_line_indices(triangles){
     res = [];
     triangles.forEach(triangle => {
@@ -289,6 +342,10 @@ function get_vertices(){
     }
 }
 
+/**
+ * 
+ * @param {*} n 
+ */
 function getColorData(n) {
     var res = [];
     for (let i = 0; i < n/3; i += 1) {
@@ -302,6 +359,10 @@ function getColorData(n) {
     return res;
 }
 
+/**
+ * produces list with colordata from triangles [t1.col,t1.col,t1.col,1,t2.col...]
+ * @param {*} triangles 
+ */
 function getColorData_fromtriangle(triangles) {
     var res = [];
 
