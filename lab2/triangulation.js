@@ -327,14 +327,15 @@ class Triangle {
     }
 
 
-    barycentric_test(p){
+    to_barycentric(p){
         // https://en.wikipedia.org/wiki/Barycentric_coordinate_system
         var detT = (this.b.y - this.c.y)*(this.a.x-this.c.x)+(this.c.x-this.b.x)*(this.a.y-this.c.y);
         var w1 = ((this.b.y-this.c.y)*(p.x-this.c.x)+(this.c.x-this.b.x)*(p.y-this.c.y))/detT;
         var w2 = ((this.c.y-this.a.y)*(p.x-this.c.x)+(this.a.x-this.c.x)*(p.y-this.c.y))/detT;
         var w3 = 1-w1-w2;
 
-        console.log(`w1:${w1}, w2:${w2}, w3:${w3}`);
+        // console.log(`w1:${w1}, w2:${w2}, w3:${w3}`);
+        return {"w1":w1, "w2":w2, "w3":w3};
     }
 }
 
@@ -344,13 +345,11 @@ function triangulate(points) {
 
     hull.forEach(point  => {
         point.distance = 0;
-        console.log(point.distance);
     });
     console.log(hull);
     // console.log(hull);
     // find c inside of triangle
     var c = hull[0];
-    console.log(c);
     var others = [];
     var middle = get_middle(hull);
     var min_distance = Number.POSITIVE_INFINITY;
@@ -466,7 +465,6 @@ function getMinDistance(point, hull){
  */
 function init_fan(c, points, parent) {
     // base case
-    console.log(points);
     if (points.length == 2) {
         var triangle = new Triangle(points[0], points[1], c);
         var node = new LeafNode(triangle, parent);

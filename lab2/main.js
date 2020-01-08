@@ -1,48 +1,58 @@
-var vertexShaderTextAlt = `
+var vertexShaderTextAlt = `#version 300 es
 precision mediump float;
 
-attribute vec2 vertposition;
-attribute vec4 a_color;
+in vec2 vertposition;
+in vec4 a_color;
 
-varying vec4 v_color;
+out vec4 v_color;
+
+uniform float time;
 
 void main()
 {
-   gl_Position = vec4(vertposition * 0.9, 0.0, 1.0);
+   vec2 pos = vec2(vertposition.x + cos(time * float(gl_VertexID) * 0.1) * 0.01, vertposition.y + sin(time * float(gl_VertexID) * 0.1) * 0.01);
+   gl_Position = vec4(pos * 0.9, 0.0, 1.0);
    v_color = a_color;
    gl_PointSize = 4.0;
 }
 `;
 
-var fragmentShaderTextAlt = `
+var fragmentShaderTextAlt = `#version 300 es
 precision mediump float;
 
-varying vec4 v_color;
+in vec4 v_color;
+
+out vec4 myOutputColor;
 
 void main(){
-    gl_FragColor = v_color;
+    myOutputColor = v_color;
 }
 `;
 
-var vertexShaderText = `
+var vertexShaderText = `#version 300 es
 precision mediump float;
 
-attribute vec2 vertposition;
+in vec2 vertposition;
+
+uniform float time;
 
 void main()
 {
-   gl_Position = vec4(vertposition * 0.9, 0.0, 1.0);
+   vec2 pos = vec2(vertposition.x + cos(time * float(gl_VertexID) * 0.1) * 0.01, vertposition.y + sin(time * float(gl_VertexID) * 0.1) * 0.01);
+   gl_Position = vec4(pos * 0.9, 0.0, 1.0);
    gl_PointSize = 4.0;
 }
 `;
 
-var fragmentShaderText = `
+var fragmentShaderText = `#version 300 es
 precision mediump float;
 
 uniform vec4 fcolor;
 
+out vec4 myOutputColor;
+
 void main(){
-    gl_FragColor = fcolor;
+    myOutputColor = fcolor;
 }
 `;
 
@@ -90,11 +100,13 @@ function genRandom(){
 
 function init() {
     var canvas = document.getElementById("graphics-surface");
-    var gl = canvas.getContext('webgl');
+    var gl = canvas.getContext("webgl2");
     if (!canvas){
         console.log("no gl for you :(");
     }
     var colorScheme = document.getElementById("selectedColorScheme").value;
+    var showLines = document.getElementById("lines");
+    var showDots = document.getElementById("dots");
     console.log(colorScheme);
 
     var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderText);
@@ -109,33 +121,38 @@ function init() {
     var programAlt = createProgram(gl, vertexShaderAlt, fragmentShaderAlt);
 
     var postitionLocation = gl.getAttribLocation(program, 'vertposition');
-    //var colorLocation = gl.getAttribLocation(program, 'a_color');
-    var colorLocation = gl.getUniformLocation(program, 'fcolor');   
+    var colorLocationAlt = gl.getAttribLocation(programAlt, 'a_color');
+    var colorLocation = gl.getUniformLocation(program, 'fcolor'); 
     
+    var timeLocation = gl.getUniformLocation(program, 'time'); 
+    var timeAltLocation = gl.getUniformLocation(programAlt, 'time'); 
+    
+    /*
     {
         let a = new Point(0, 1);
         let b = new Point(0, 0);
         let c = new Point(1,0);
         let p = new Point(.5, -1);
         let triangletest = new Triangle(a,b,c);
-        triangletest.barycentric_test(p);
+        triangletest.to_barycentric(p);
     }
+    */
         
     
     var vertices = get_vertices();
     assign_ids(vertices);
     var tree = triangulate(vertices);
     var triangles = tree.get_triangles();
-    // const line_data = get_line_data()
-    const triangle_indices = get_triangle_indices(triangles); 
-    //console.log(triangle_indices);
 
-    //console.log(triangles);
+    const triangle_indices = get_triangle_indices(triangles); 
+
 
     // for the 4color scheme
     triangles.forEach(triangle => {
         triangle.set_color();
     });
+
+
 
     // gradient scheme
     /**
@@ -144,26 +161,25 @@ function init() {
      * 3. create color data for triangles
      */
     // vertices
-    let red_index = Math.floor(Math.random() * vertices.length);
-    let green_index;
-    do{
-        green_index = Math.floor(Math.random() * vertices.length);
-    }
-    while (green_index === red_index);
 
-    let blue_index;
-    do{
-        blue_index = Math.floor(Math.random() * vertices.length);
-    }
-    while (blue_index === red_index || blue_index === green_index);
+    //generate a triangle from 3 randomly choose vertices in vertex source
+    let rgb_triangle = get_random_triangle(vertices);
+    console.log(rgb_triangle);
+    
 
     vertices.forEach(vertex => {
-        var col = get_barycentric_color(vertex, vertices[red_index], vertices[green_index], vertices[blue_index]);
-        
+        var col = get_barycentric_color(vertex, rgb_triangle);
+        vertex.color = col;
     });
 
-    console.log(`v_len:${vertices.length}, i1:${blue_index}, i2:${green_index}, i3:${blue_index}`);
-    // var color_data = getColorData_fromtriangle(triangles);
+
+
+
+
+
+
+
+    var color_data = get_vertex_colordata(vertices);
     var vertex_data = get_vertex_data(vertices);
 
     const point_indices = get_point_indices(vertices);
@@ -182,10 +198,10 @@ function init() {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertex_data), gl.STATIC_DRAW);
 
-
-    // var colorBuffer = gl.createBuffer();
-    // gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color_data), gl.STATIC_DRAW);
+    // gradient coloring
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color_data), gl.STATIC_DRAW);
 
 
     const triangleIndexBuffer = gl.createBuffer();
@@ -201,13 +217,38 @@ function init() {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(line_indices), gl.STATIC_DRAW);
     
 
-    drawScene();
+    var then = 0.0;
+    requestAnimationFrame(drawScene);
 
-    function drawScene() {
+    function drawScene(now) {
+        now *= 0.001;
+        var deltaTime = now - then;
+        then = now;
+
+
+
         gl.clearColor(1.0, 1.0, 0.8, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-        gl.useProgram(program);
+        if(colorScheme == "barycentric"){
+            gl.useProgram(programAlt);
+            gl.uniform1f(timeAltLocation, now);
+            // colour
+       
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+
+            var size = 4;          // 4 components per iteration
+            var type = gl.FLOAT;   // the data is 32bit floats
+            var normalize = false; // don't normalize the data
+            var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+            var offset = 0;        // start at the beginning of the buffer
+            gl.vertexAttribPointer(colorLocationAlt, size, type, normalize, stride, offset);
+            gl.enableVertexAttribArray(colorLocationAlt);
+        }else{
+            gl.useProgram(program);
+            gl.uniform1f(timeLocation, now);
+        }
+        
 
         // position
         
@@ -223,29 +264,35 @@ function init() {
         gl.vertexAttribPointer(postitionLocation, size, type, normalize, stride, offset);
         gl.enableVertexAttribArray(postitionLocation);
 
-        // colour
-       
-        // gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-
-        // var size = 4;          // 4 components per iteration
-        // var type = gl.FLOAT;   // the data is 32bit floats
-        // var normalize = false; // don't normalize the data
-        // var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-        // var offset = 0;        // start at the beginning of the buffer
-        // gl.vertexAttribPointer(colorLocation, size, type, normalize, stride, offset);
-        // gl.enableVertexAttribArray(colorLocation);
+        
 
         //gl.drawArrays(gl.TRIANGLES, 0, vertex_count);
+        if (colorScheme == "simple"){
+            gl.uniform4f(colorLocation, 1,0,0, 1);
+        }
+
         for (var i = 0;  i < triangles.length; i += 1){
-            gl.uniform4f(colorLocation, triangles[i].color[0], triangles[i].color[1], triangles[i].color[2],1);
+            if (colorScheme == "4colors"){
+                gl.uniform4f(colorLocation, triangles[i].color[0], triangles[i].color[1], triangles[i].color[2], 1);
+            }
+            
             gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, i*6);
         }
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pointIndexBuffer);
+        gl.useProgram(program);
+        gl.uniform1f(timeLocation, now);
         gl.uniform4f(colorLocation, 0,0,0,1);
-        gl.drawElements(gl.POINTS, point_indices.length, gl.UNSIGNED_SHORT, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
-        gl.drawElements(gl.LINES, line_indices.length , gl.UNSIGNED_SHORT, 0);
+        if (showDots.checked){
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pointIndexBuffer);
+            gl.drawElements(gl.POINTS, point_indices.length, gl.UNSIGNED_SHORT, 0);
+        }
+        
+        if (showLines.checked){
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+            gl.drawElements(gl.LINES, line_indices.length , gl.UNSIGNED_SHORT, 0);
+        }
+
+        requestAnimationFrame(drawScene);
 
         //gl.drawArrays(gl.LINES, 0, vertex_count);
     }
@@ -280,15 +327,59 @@ function init() {
     // }
 }
 
+function get_random_triangle(vertices){
+    let red_index = Math.floor(Math.random() * vertices.length);
+    let green_index;
+    do{
+        green_index = Math.floor(Math.random() * vertices.length);
+    }
+    while (green_index === red_index);
+
+    let blue_index;
+    do{
+        blue_index = Math.floor(Math.random() * vertices.length);
+    }
+    while (blue_index === red_index || blue_index === green_index);
+
+    return (new Triangle(vertices[red_index], vertices[green_index], vertices[blue_index]));
+}
+
 /**
  * 
  * @param {Point} vertex 
- * @param {Point} red 
- * @param {Point} green 
- * @param {Point} blue 
+ * @param {Triangle} triangle 
  */
 function get_barycentric_color(vertex, triangle){
+    let barycentric = triangle.to_barycentric(vertex);
+    let max = barycentric.w1;
+    let min = barycentric.w1;
+    let closest = triangle.a;
+    
+    if (barycentric.w2 > max){
+        max = barycentric.w2;
+        closest = triangle.b;
+    }else if (barycentric.w2 < min){
+        min = barycentric.w2;
+    }
 
+    if (barycentric.w3 > max){
+        max = barycentric.w3;
+        closest = triangle.c;
+    }else if (barycentric.w3 < min){
+        min = barycentric.w3;
+    }
+
+    let abs = max - min;
+    let alpha = 1;
+    // vertex is outside triangle
+    // console.log(`vdis:${vertex.distance}, tot:${Point.distance_squared(closest, vertex)}, barry:${[barycentric.w1,barycentric.w2,barycentric.w3]}, min: ${min}`);
+
+    if (min < -0.01) {
+
+        alpha = vertex.distance / (vertex.distance + Point.distance_squared(closest, vertex));
+    }
+    let col = {"red": (barycentric.w1 - min) / abs, "green": (barycentric.w2 - min) / abs, "blue": (barycentric.w3 - min) / abs, "alpha": alpha};
+    return col;
 }
 
 function get_line_indices(triangles){
@@ -314,6 +405,14 @@ function get_vertex_data(vertices){
     res = [];
     vertices.forEach(vertex => {
         res.push(vertex.x, vertex.y);
+    });
+    return res;
+}
+
+function get_vertex_colordata(vertices){
+    res = [];
+    vertices.forEach(vertex => {
+        res.push(vertex.color.red, vertex.color.green, vertex.color.blue, vertex.color.alpha);
     });
     return res;
 }
