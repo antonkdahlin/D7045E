@@ -42,6 +42,14 @@ class GraphicsNode {
 
     draw(gl){
         
+
+        
+        this.mesh.bind_vao(gl);
+
+        this.material.applyMaterial(gl);
+
+        console.log(`drawing ${this.mesh.element_count} elements`);
+        gl.drawElements(gl.TRIANGLES, this.mesh.element_count , gl.UNSIGNED_SHORT, 0);
     }
 }
 
@@ -52,32 +60,51 @@ class Mesh {
     //     this.vertexArrayObject = vertexArrayObject;
     // }
 
-    constructor (gl, vertices, indices) {
-        var vao = gl.createVertexArray();
+    constructor (gl, attribLocation, vertices, indices) {
+        this.vao = gl.createVertexArray();
+        this.vbo = gl.createBuffer();
+        this.ibo = gl.createBuffer();
 
-        // let vbo = gl.createBuffer();
-        // let ibo = gl.createBuffer();
+        this._element_count = indices.length;
+        // console.log(`constructing mesh of len ${indices.length}`)
 
-        // gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-        // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        gl.bindVertexArray(this.vao);
 
-        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-        // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(indices), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+        console.log('buffering vertices');
+        console.log(vertices);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+        
+
+        
+
+        console.log('buffering indices');
+        console.log(indices);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+        // Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
+        var size = 3;          // 3 components per iteration
+        var type = gl.FLOAT;   // the data is 32bit floats
+        var normalize = false; // don't normalize the data
+        var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+        var offset = 0;        // start at the beginning of the buffer
+        gl.vertexAttribPointer(attribLocation, size, type, normalize, stride, offset);
+
+        // Turn on the attribute
+        gl.enableVertexAttribArray(attribLocation);
 
         // this.vertexBufferObject = vbo;
         // this.indexBufferObject = ibo;
     }
 
-    get vertexBufferObject() {
-        return this.vertexBufferObject;
+    bind_vao(gl){
+        gl.bindVertexArray(this.vao);
     }
 
-    get indexBufferObject() {
-        return this.indexBufferObject;
-    }
-
-    get vertexArrayObject() {
-        return this.vertexArrayObject;
+    get element_count() {
+        return this._element_count;
     }
 }
 
@@ -154,19 +181,19 @@ class Material {
      * @param {ShaderProgram} shaderProgram 
      */
     constructor (shaderProgram) {
-        this.shaderProgram = shaderProgram;
+        this._shaderProgram = shaderProgram;
     }
 
-    get program(){
-        return this.shaderProgram;
+    get shaderProgram(){
+        return this._shaderProgram;
     }
 }
 
 class SimpleMaterial extends Material {
-    constructor (color, program) {
-        super(program);
+    constructor (gl, color, shaderProgram) {
+        super(shaderProgram);
         this._color = color;
-        this.colorLocation = gl.getUniformLocation(program, 'u_color');
+        this.colorLocation = gl.getUniformLocation(shaderProgram.program, 'u_color');
     }
 
     get color(){
@@ -174,7 +201,10 @@ class SimpleMaterial extends Material {
     }
 
     applyMaterial (gl) {
-        gl.useProgram(this.program);
+        console.log("using program");
+        gl.useProgram(this.shaderProgram.program);
+        
+        console.log(`setting color uniform to ${this.color.asVec()}`);
         gl.uniform4fv(this.colorLocation, this.color.asVec());
     }
 }
@@ -188,21 +218,45 @@ function init() {
         console.log("no gl for you :(");
     }
 
-    let cubedata = gen_cube_data(1.0);
-    const cube_i = cubedata.indices;
-    const cube_v = cubedata.vertices;
-    const cubemesh = new Mesh(cube_i, cube_v);
+   
 
     const v_shader = new Shader(gl, vertexShader, ShaderType.VERTEX);
     const f_shader = new Shader(gl, fragmentShader, ShaderType.FRAGMENT);
 
-    const program = new ShaderProgram(gl, [v_shader, f_shader]);
+    const shaderProgram = new ShaderProgram(gl, [v_shader, f_shader]);
+    
+    const posLocation = gl.getAttribLocation(shaderProgram.program, 'in_position');
+    let cubedata = gen_cube_data(.5);
+    const cube_i = cubedata.indices;
+    const cube_v = cubedata.vertices;
+    const test_i = [0,1,2];
+    const test_v = [
+        -.7,-.7,1,
+        .7,-.7,1,
+        0,.7,1
+    ]
 
-    const material = new SimpleMaterial(new Color(1,0,0), program);
+    const cubemesh = new Mesh(gl, posLocation, cube_v, cube_i);
 
-    const graphics_node = new GraphicsNode(mesh, material);
+    const trianglemesh = new Mesh(gl, posLocation, test_v, test_i);
 
 
+    const material = new SimpleMaterial(gl, new Color(1,0,0), shaderProgram);
+
+    const greenMat = new SimpleMaterial(gl, new Color(0,1,0), shaderProgram);
+
+    const graphics_node = new GraphicsNode(cubemesh, material);
+    const triangle = new GraphicsNode(trianglemesh, greenMat);
+
+
+
+
+
+    gl.clearColor( 0.8, 0.8, 0.8, 1.0 );
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    graphics_node.draw(gl);
+    triangle.draw(gl);
 }
 
 function gen_cube_data(r) {
