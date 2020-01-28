@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <script src="shaders.js"></script>
+        <script src="matrix_lib.js"></script>
+    </head>
+    <body onload="init();">
+        <canvas id="graphics-surface" width="600" height="600"></canvas></br>
+        
+        fov
+        <input type="range" min="30" max="120" value="60" step="1" id="fovSlide">
+        <output id="fovval"></output></br>
+
+        light
+        <input type="range" min="0" max="360" value="60" step="1" id="lightSlide">
+        <output id="lightVal"></output></br>
+
+        lighth
+        <input type="range" min="0" max="400" value="60" step="1" id="lighthSlide">
+        <output id="lighthVal"></output></br>
+
+
+        <script src="lab4.js"></script>
+        <script>(function(){
+            var script=document.createElement('script');
+            script.onload=function(){
+                var stats=new Stats();
+                document.body.appendChild(stats.dom);
+                requestAnimationFrame(function loop(){
+                    stats.update();
+                    requestAnimationFrame(loop)
+                });
+            };
+            script.src='https://mrdoob.github.io/stats.js/build/stats.min.js';
+            document.head.appendChild(script);
+        })()</script>
+    </body>
+</html>
