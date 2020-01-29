@@ -90,6 +90,11 @@ class Node {
         
     }
 
+    xRotation(angleInRad){
+        this.transform.rotation.x = angleInRad;
+        this.updateTransformMatrix();
+    }
+
     xRotate (angleInRad){
         this.transform.rotation.x += angleInRad;
         this.updateTransformMatrix();
@@ -100,8 +105,18 @@ class Node {
         this.updateTransformMatrix();
     }
 
+    yRotation (angleInRad){
+        this.transform.rotation.y = angleInRad;
+        this.updateTransformMatrix();
+    }
+
     zRotate (angleInRad){
         this.transform.rotation.z += angleInRad;
+        this.updateTransformMatrix();
+    }
+
+    zRotation (angleInRad){
+        this.transform.rotation.z = angleInRad;
         this.updateTransformMatrix();
     }
 
@@ -415,12 +430,10 @@ class Camera extends Node {
         this.updateTransformMatrix();
 
         // Mechanics
-        this.x_velocity = 0;
-        this.y_velocity = 0;
-        this.z_velocity = 0;
-        this.x_acceleration = 0;
-        this.y_acceleration = 0;
-        this.z_acceleration = 0;
+        this.dolly_velocity = 0;
+        this.truck_velocity = 0;
+        this.dolly_acceleration = 0;
+        this.truck_acceleration = 0;
 
         this.friction = 7;
     }
@@ -435,7 +448,8 @@ class Camera extends Node {
     }
 
     updateViewProjMatrix(){
-        var camMatrix = m4.translation(this.transform.translation.x,70, this.transform.translation.z);
+        //console.log(this.transform.translation.y);
+        var camMatrix = m4.translation(this.transform.translation.x, this.transform.translation.y, this.transform.translation.z);
         camMatrix = m4.yRotate(camMatrix,  this.transform.rotation.x );
         camMatrix = m4.xRotate(camMatrix,  this.transform.rotation.y );
         
@@ -471,15 +485,19 @@ class Camera extends Node {
     }
 
     update (deltaTime){ 
-        if (Math.abs(this.x_velocity) < 0.01) { this.x_velocity = 0; }
-        if (Math.abs(this.y_velocity) < 0.01) { this.y_velocity = 0; }
-        if (Math.abs(this.z_velocity) < 0.01) { this.z_velocity = 0; }
+        if (Math.abs(this.dolly_velocity) < 0.01) { this.dolly_velocity = 0; }
+        if (Math.abs(this.truck_velocity) < 0.01) { this.truck_velocity = 0; }
 
-        this.x_velocity += (this.x_acceleration - this.x_velocity * this.friction) * deltaTime;
-        this.y_velocity += (this.y_acceleration - this.y_velocity * this.friction) * deltaTime;
-        this.z_velocity += (this.z_acceleration - this.z_velocity * this.friction) * deltaTime;
+        this.dolly_velocity += (this.dolly_acceleration - this.dolly_velocity * this.friction) * deltaTime;
+        this.truck_velocity += (this.truck_acceleration - this.truck_velocity * this.friction) * deltaTime;
+        
+        let sinpan = Math.sin(this.transform.rotation.x);
+        let cospan = Math.cos(this.transform.rotation.x);
 
-        this.translate(this.x_velocity, this.y_velocity, this.z_velocity);
+        let x_vel = this.dolly_velocity * -sinpan + this.truck_velocity * -cospan;
+        let z_vel = this.dolly_velocity * -cospan + this.truck_velocity * sinpan;
+
+        this.translate(x_vel, 0.0, z_vel);
     }
 }
 
@@ -500,6 +518,7 @@ function init() {
     }
 
     var fovSlide = document.getElementById("fovSlide");
+    var camhSlide = document.getElementById("camhSlide");
     var lightSlide = document.getElementById("lightSlide");
     var lighthSlide = document.getElementById("lighthSlide");
     var cube2xtSlide = document.getElementById("cube2xt");
@@ -520,28 +539,33 @@ function init() {
     const u_lightPositionLoc = gl.getUniformLocation(shaderProgram.program, 'u_lightPosition');
     const u_viewPositionLoc = gl.getUniformLocation(shaderProgram.program, 'u_cameraPosition');
     const u_lightColorLoc = gl.getUniformLocation(shaderProgram.program, 'u_lightColor');
+    const instensityLoc = gl.getUniformLocation(shaderProgram.program, 'intensity');
     console.log(u_lightColorLoc);
 
 
     let axisLen = 100;
     const axismesh = Mesh.makeCuboid(gl, posLocation, normalLocation, axisLen, 1, 1);
-    const cubemesh = Mesh.makeCuboid(gl, posLocation, normalLocation, 20, 20, 20);
+    const cubemesh = Mesh.makeCuboid(gl, posLocation, normalLocation, 1,1,1);
     const material = new SimpleMaterial(gl, new Color(1,0,0), shaderProgram);
 
     // LIGHSOURCE
-    let lightSource = new LightSource(1, new Color(1,1,1));
+    let lightSource = new LightSource(1000, new Color(1,1,1));
     lightSource.translate(-60, 100, -60);
 
     lightSlide.oninput = (e) => {
         lightVal.value = lightSlide.value;
-        lightSource.transform.translation.x = 100 * Math.cos(degToRad(lightSlide.value));
-        lightSource.transform.translation.z = 100 * Math.sin(degToRad(lightSlide.value));
+        lightSource.transform.translation.x = 300 * Math.cos(degToRad(lightSlide.value));
+        lightSource.transform.translation.z = 300 * Math.sin(degToRad(lightSlide.value));
     };
 
     lighthSlide.oninput = (e) => {
         lighthVal.value = lighthSlide.value;
         lightSource.transform.translation.y = lighthSlide.value;
-        
+    };
+
+    intensitySlide.oninput = (e) => {
+        intensityVal.value = intensitySlide.value;
+        lightSource.intensity = intensitySlide.valueAsNumber;
     };
 
     // CAMERA
@@ -549,38 +573,112 @@ function init() {
 
     fovSlide.oninput = (e) => {
         fovval.value = fovSlide.value;
-        camera.fov = degToRad( fovSlide.value);
+        camera.fov = degToRad( fovSlide.valueAsNumber);
     };
 
-    
-
-
-    const cube1 = new GraphicsNode(cubemesh, material, u_transformLoc, u_worldLoc);
-    cube1.update = function( deltaTime, now) {
-        this.translate(0,0,Math.cos(now));
-        this.xRotate(deltaTime / 2);
-        this.yRotate(deltaTime / 3);
-        this.zRotate(deltaTime / 5);
-        this.updateTransformMatrix();
+    camhSlide.oninput = (e) => {
+        camhval.value = camhSlide.value;
+        camera.transform.translation.y = camhSlide.valueAsNumber;
+        camera.updateTransformMatrix();
     };
 
-    const cube2 = new GraphicsNode(cubemesh, new SimpleMaterial(gl, new Color(0,.5,.7), shaderProgram), u_transformLoc, u_worldLoc);
-    cube2.translate(30,0,0);
-    cube2.scaling(5,5,5);
+    // ROBOT
+    // reye, leye, mouth
+    const bodyMesh = Mesh.makeCuboid(gl, posLocation, normalLocation, 10,30,20);
+    const armMesh = Mesh.makeCuboid(gl, posLocation, normalLocation, 10,30,10);
+    const headMesh = Mesh.makeCuboid(gl, posLocation, normalLocation, 20,20,20);
 
-    const cube3 = new GraphicsNode(cubemesh, new SimpleMaterial(gl, new Color(1,.5,.7), shaderProgram), u_transformLoc, u_worldLoc);
-    cube3.translate(0, 15, 0);
-    cube3.scaling(.3,.9,.4);
+    const body =        new GraphicsNode(bodyMesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    body.translate(-100, 50, 100);
 
-    // scene tree 
-    // cube1.add(cube2);
-    cube2.add(cube3);
+    const rshoulder =   new GraphicsNode(cubemesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    rshoulder.translate(0,15,10);
+    rshoulder.update = function(delta, now){
+        this.zRotation(Math.cos(now));
+    }
+
+    const lshoulder =   new GraphicsNode(cubemesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    lshoulder.translate(0,15,-10);
+    lshoulder.update = function(delta, now){
+        this.zRotation(-Math.cos(now));
+    }
+    const rarm =        new GraphicsNode(armMesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    rarm.translate(0,-15,5);
+
+    const larm =        new GraphicsNode(armMesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    larm.translate(0,-15,-5);
+
+    const neck =        new GraphicsNode(cubemesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    neck.translate(0,15,0);
+
+    const head =        new GraphicsNode(headMesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    head.translate(0,10,0);
+    head.update = function(delta, now){
+        this.yRotation(Math.cos(now));
+    }
+
+    const mouth = new GraphicsNode(cubemesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    mouth.scaling(3, 3, 10);
+    mouth.translate(10, -5, 0);
+
+    const reye = new GraphicsNode(cubemesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    reye.scaling(3,3,3);
+    reye.translate(10, 5, 5);
+
+    const leye = new GraphicsNode(cubemesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+    leye.scaling(3,3,3);
+    leye.translate(10, 5, -5);
+
+    body.add(rshoulder);
+    body.add(lshoulder);
+    body.add(neck);
+    rshoulder.add(rarm);
+    lshoulder.add(larm);
+    neck.add(head);
+    head.add(mouth);
+    head.add(reye);
+    head.add(leye);
+
+
+
+
+
+    // solar system
+    const arrowCube = new GraphicsNode(cubemesh, new SimpleMaterial(gl, new Color(1,1,0), shaderProgram), u_transformLoc, u_worldLoc);
+    arrowCube.translate(100, 100, -100);
+    arrowCube.scaling(40,40,40);
+    arrowCube.update = function(deltaTime, now){
+        this.yRotate(deltaTime / 15.2);
+    };
+
+    const earthCube = new GraphicsNode(cubemesh, new SimpleMaterial(gl, new Color(0,0,1), shaderProgram), u_transformLoc, u_worldLoc);
+    earthCube.scaling(.25,.25,.25);
+    earthCube.translate(0,0,3);
+    earthCube.update = function(deltaTime, now){
+        this.yRotate(deltaTime);
+    };
+
+    const moonCube = new GraphicsNode(cubemesh, new SimpleMaterial(gl, new Color(.3,.3,.3), shaderProgram), u_transformLoc, u_worldLoc);
+    moonCube.scaling(.25,.25,.25);
+    moonCube.translate(0,0,2);
     
+    arrowCube.add(earthCube);
+    earthCube.add(moonCube);
+    
+    //random stationary blocks
+    let randomCubes = [];
+    for(let i = 0; i < 16; i+=1){
+        let newCube = new GraphicsNode(cubemesh, getRandomMaterial(gl, shaderProgram), u_transformLoc, u_worldLoc);
+        let randy = Math.random()*100;
+        newCube.scaling(Math.random()*100, randy, Math.random()*100);
+        newCube.translate((i%4)* 150, randy/2, Math.floor(i/4) * 150);
+        randomCubes.push(newCube);
+    }
 
 
     const floor = new GraphicsNode(cubemesh, new SimpleMaterial(gl, new Color(0,.5,0), shaderProgram), u_transformLoc, u_worldLoc);
-    floor.scaling(100,1,100);
-    floor.translate(0,-30,0);
+    floor.scaling(2000,1,2000);
+    floor.translate(0,-1,0);
 
     const xaxis = new GraphicsNode(axismesh, new SimpleMaterial(gl, new Color(1,0,0), shaderProgram), u_transformLoc, u_worldLoc);
     xaxis.translate(axisLen / 2, 0, 0);
@@ -590,7 +688,6 @@ function init() {
     yaxis.zRotate(Math.PI / 2);
 
     const zaxis = new GraphicsNode(axismesh, new SimpleMaterial(gl, new Color(0,0,1), shaderProgram), u_transformLoc, u_worldLoc);
-
     zaxis.translate(0, 0, axisLen / 2);
     zaxis.yRotate(Math.PI / 2);
 
@@ -600,22 +697,44 @@ function init() {
      * wasd to move camera
      */
     let acc = 10;
+    let arrowCubeSpeed  = 10 ;
     window.addEventListener('keydown', (evt) => {
         switch (evt.keyCode) {
             case 87:
                 // w
-                camera.z_acceleration = acc;
+                camera.dolly_acceleration = acc;
                 break;
             case 65:
                 // a
-                camera.x_acceleration = acc;
+                camera.truck_acceleration = acc;
                 break;
             case 83:
-                camera.z_acceleration = -acc;
+                // s
+                camera.dolly_acceleration = -acc;
                 break;
             case 68:
                 // d
-                camera.x_acceleration = -acc;
+                camera.truck_acceleration = -acc;
+                break;
+            case 37:
+                // left
+                arrowCube.translate(-arrowCubeSpeed, 0, 0);
+                break;
+            case 39:
+                // right
+                arrowCube.translate(arrowCubeSpeed, 0, 0);
+                break;
+            case 38:
+                // up
+                arrowCube.translate(0, 0, arrowCubeSpeed);
+                break;
+            case 40:
+                // down
+                arrowCube.translate(0, 0, -arrowCubeSpeed);
+                break;
+
+            default:
+                console.log(evt.keyCode);
                 break;
         }
     }, false);
@@ -624,28 +743,29 @@ function init() {
         switch (evt.keyCode) {
             case 87:
                 // w
-                if (camera.z_acceleration == acc){
-                    camera.z_acceleration = 0;
+                if (camera.dolly_acceleration == acc){
+                    camera.dolly_acceleration = 0;
                 }
                 break;
             case 65:
                 // a
-                if (camera.x_acceleration == acc){
-                    camera.x_acceleration = 0;
+                if (camera.truck_acceleration == acc){
+                    camera.truck_acceleration = 0;
                 }
                 break;
             case 83:
                 // s
-                if (camera.z_acceleration == -acc){
-                    camera.z_acceleration = 0;
+                if (camera.dolly_acceleration == -acc){
+                    camera.dolly_acceleration = 0;
                 }
                 break;
             case 68:
                 // d
-                if (camera.x_acceleration == -acc){
-                    camera.x_acceleration = 0;
+                if (camera.truck_acceleration == -acc){
+                    camera.truck_acceleration = 0;
                 }
                 break;
+            
         }
     }, false);
             
@@ -674,7 +794,9 @@ function init() {
         }
     }, false);
 
-    let objects = [cube1, cube2, cube3, floor, xaxis, yaxis, zaxis];
+    // let objects = [cube1, cube2, cube3, floor, xaxis, yaxis, zaxis, arrowCube, earthCube, moonCube];
+    let stationaryObjects = randomCubes.concat([xaxis, yaxis, zaxis, floor]);
+    let objects = [body, rshoulder, lshoulder, rarm, larm, neck, head, leye, reye, mouth, arrowCube, earthCube, moonCube];
 
 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); // ??
@@ -694,17 +816,20 @@ function init() {
         gl.clearColor( .53, 0.81, 0.92,1 );
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        
-
         let viewProjMat = camera.viewProjMat;
 
         gl.uniform3fv(u_lightPositionLoc, lightSource.translation);
         gl.uniform3fv(u_viewPositionLoc, camera.translation);
         gl.uniform3fv(u_lightColorLoc, lightSource.color.rgb);
+        gl.uniform1f(instensityLoc, lightSource.intensity);
 
         objects.forEach(object => {
             object.update(deltaTime, now);
-            object.draw(gl, viewProjMat.slice());
+            object.draw(gl, viewProjMat);
+        });
+
+        stationaryObjects.forEach(object => {
+            object.draw(gl, viewProjMat);
         });
         
         requestAnimationFrame(drawScene); // for some reason this crashes the browser
@@ -712,7 +837,9 @@ function init() {
     
 }
 
-
+function getRandomMaterial(gl, shaderProgram){
+    return new SimpleMaterial(gl, new Color(Math.random(), Math.random(), Math.random()), shaderProgram);
+}
 
 
 

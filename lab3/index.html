@@ -9,16 +9,24 @@
         <canvas id="graphics-surface" width="600" height="600"></canvas></br>
         
         fov
-        <input type="range" min="30" max="120" value="60" step="1" id="fovSlide">
+        <input type="range" min="30" max="180" value="60" step="1" id="fovSlide">
         <output id="fovval"></output></br>
+
+        camh
+        <input type="range" min="-50" max="1000" value="60" step="1" id="camhSlide">
+        <output id="camhval"></output></br>
 
         light
         <input type="range" min="0" max="360" value="60" step="1" id="lightSlide">
         <output id="lightVal"></output></br>
 
         lighth
-        <input type="range" min="0" max="400" value="60" step="1" id="lighthSlide">
+        <input type="range" min="0" max="1000" value="60" step="1" id="lighthSlide">
         <output id="lighthVal"></output></br>
+
+        intensity
+        <input type="range" min="0" max="30000" value="60" step="5" id="intensitySlide">
+        <output id="intensityVal"></output></br>
 
 
         <script src="lab4.js"></script>
